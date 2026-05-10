@@ -1,7 +1,5 @@
 package com.app.ecomapplication.service;
-
 import com.app.ecomapplication.model.User;
-
 import java.util.List;
 
 public interface UserService {
@@ -12,4 +10,5 @@ public interface UserService {
     User addUser(User user);
     User updateUser(Long id, User user);
     void deleteUser(Long id);
+    List<User> syncUsersFromApi();
 }

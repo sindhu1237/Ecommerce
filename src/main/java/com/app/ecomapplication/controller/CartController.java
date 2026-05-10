@@ -22,6 +22,10 @@ public class CartController {
     public List<Cart> getAllCarts() {
         return cartService.getAllCarts();
     }
+    @PostMapping("/sync")
+    public List<Cart> syncCarts() {
+        return cartService.syncCartsFromApi();
+    }
 
     @GetMapping("/{id}")
     public Cart getCartById(@PathVariable Long id) {

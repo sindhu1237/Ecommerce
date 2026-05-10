@@ -11,27 +11,35 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/products")
 public class ProductController {
+
     private final ProductService productService;
+
     @Autowired
     public ProductController(ProductService productService) {
         this.productService = productService;
     }
+
+    @PostMapping("/sync")
+    public List<Product> syncProducts() {
+        return productService.syncProductsFromApi();
+    }
+
     @GetMapping
     public List<Product> getAllProducts() {
         return productService.getAllProducts();
     }
-    @GetMapping("/{id}")
-    public Product getProductById(@PathVariable Long id) {
-        return productService.getProductById(id);
-    }
 
     @GetMapping("/limited")
-    public List<Product> getProductsLimited(@RequestParam(defaultValue = "5") int limit) {
+    public List<Product> getProductsLimited(
+            @RequestParam(defaultValue = "5") int limit
+    ) {
         return productService.getProductsLimited(limit);
     }
 
     @GetMapping("/sorted")
-    public List<Product> getProductsSorted(@RequestParam(defaultValue = "desc") String sort) {
+    public List<Product> getProductsSorted(
+            @RequestParam(defaultValue = "desc") String sort
+    ) {
         return productService.getProductsSorted(sort);
     }
 
@@ -41,22 +49,38 @@ public class ProductController {
     }
 
     @GetMapping("/category/{category}")
-    public List<Product> getProductsByCategory(@PathVariable String category) {
+    public List<Product> getProductsByCategory(
+            @PathVariable String category
+    ) {
         return productService.getProductsByCategory(category);
     }
 
+    @GetMapping("/{id}")
+    public Product getProductById(
+            @PathVariable Long id
+    ) {
+        return productService.getProductById(id);
+    }
+
     @PostMapping
-    public Product addProduct(@RequestBody Product product) {
+    public Product addProduct(
+            @RequestBody Product product
+    ) {
         return productService.addProduct(product);
     }
 
     @PutMapping("/{id}")
-    public Product updateProduct(@PathVariable Long id, @RequestBody Product product) {
+    public Product updateProduct(
+            @PathVariable Long id,
+            @RequestBody Product product
+    ) {
         return productService.updateProduct(id, product);
     }
 
     @DeleteMapping("/{id}")
-    public void deleteProduct(@PathVariable Long id) {
+    public void deleteProduct(
+            @PathVariable Long id
+    ) {
         productService.deleteProduct(id);
     }
 }

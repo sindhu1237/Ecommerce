@@ -1,112 +1,152 @@
 package com.app.ecomapplication.service.impl;
-
-import com.app.ecomapplication.constants.FakeStoreApiConstants;
 import com.app.ecomapplication.exception.ProductNotFoundException;
 import com.app.ecomapplication.model.Category;
 import com.app.ecomapplication.model.Product;
+import com.app.ecomapplication.repository.ProductRepository;
 import com.app.ecomapplication.service.ProductService;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
 import java.util.Arrays;
 import java.util.List;
-
 @Service
 public class ProductServiceImpl implements ProductService {
 
     @Value("${product.fakestore.api.url}")
     private String apiUrl;
-
+    private final ProductRepository productRepository;
     private final RestTemplate restTemplate;
-
-    public ProductServiceImpl(RestTemplate restTemplate) {
+    public ProductServiceImpl(
+            ProductRepository productRepository,
+            RestTemplate restTemplate
+    ) {
+        this.productRepository = productRepository;
         this.restTemplate = restTemplate;
     }
+    @Override
+    public List<Product> syncProductsFromApi() {
 
+        Product[] apiProducts =
+                restTemplate.getForObject(
+                        apiUrl,
+                        Product[].class
+                );
+        if (apiProducts == null) {
+            throw new ProductNotFoundException(
+                    "No products found"
+            );
+        }
+        List<Product> products =
+                Arrays.asList(apiProducts);
+        List<Product> newProducts =
+                products.stream()
+                        .filter(product ->
+                                productRepository
+                                        .findByTitle(
+                                                product.getTitle()
+                                        )
+                                        .isEmpty()
+                        )
+                        .peek(product ->
+                                product.setId(null))
+                        .toList();
+
+        return productRepository.saveAll(newProducts);
+    }
     @Override
     public List<Product> getAllProducts() {
-        Product[] products = restTemplate.getForObject(apiUrl, Product[].class);
-        if (products == null) {
-            throw new ProductNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return Arrays.asList(products);
+        return productRepository.findAll();
     }
 
     @Override
     public Product getProductById(Long id) {
-        Product product = restTemplate.getForObject(apiUrl + "/" + id, Product.class);
-        if (product == null) {
-            throw new ProductNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return product;
-    }
 
+        return productRepository.findById(id)
+                .orElseThrow(() ->
+                        new ProductNotFoundException(
+                                "Product not found"
+                        ));
+    }
     @Override
     public List<Product> getProductsLimited(int limit) {
-        Product[] products = restTemplate.getForObject(apiUrl + "?limit=" + limit, Product[].class);
-        if (products == null) {
-            throw new ProductNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return Arrays.asList(products);
-    }
 
+        return productRepository.findAll()
+                .stream()
+                .limit(limit)
+                .toList();
+    }
     @Override
     public List<Product> getProductsSorted(String sort) {
-        Product[] products = restTemplate.getForObject(apiUrl + "?sort=" + sort, Product[].class);
-        if (products == null) {
-            throw new ProductNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return Arrays.asList(products);
-    }
 
+        Sort sorting = sort.equalsIgnoreCase("desc")
+                ? Sort.by("price").descending()
+                : Sort.by("price").ascending();
+
+        return productRepository.findAll(sorting);
+    }
     @Override
     public List<Category> getAllCategories() {
-        ResponseEntity<Category[]> response = restTemplate.getForEntity(apiUrl + "/categories", Category[].class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new ProductNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return Arrays.asList(response.getBody());
-    }
+        List<String> categories =
+                productRepository.findAll()
+                        .stream()
+                        .map(Product::getCategory)
+                        .distinct()
+                        .toList();
 
+        return categories.stream()
+                .map(Category::new)
+                .toList();
+    }
     @Override
-    public List<Product> getProductsByCategory(String category) {
-        ResponseEntity<Product[]> response = restTemplate.getForEntity(apiUrl + "/category/" + category,
-                Product[].class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new ProductNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return Arrays.asList(response.getBody());
+    public List<Product> getProductsByCategory(
+            String category
+    ) {
+        return productRepository.findAll()
+                .stream()
+                .filter(p ->
+                        p.getCategory()
+                                .equalsIgnoreCase(category)
+                )
+                .toList();
     }
 
     @Override
     public Product addProduct(Product product) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Product> request = new HttpEntity<>(product, headers);
-        ResponseEntity<Product> response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, Product.class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new ProductNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return response.getBody();
+        return productRepository.save(product);
     }
 
     @Override
-    public Product updateProduct(Long id, Product product) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Product> request = new HttpEntity<>(product, headers);
-        ResponseEntity<Product> response = restTemplate.exchange(apiUrl + "/" + id, HttpMethod.PUT, request,
-                Product.class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new ProductNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return response.getBody();
+    public Product updateProduct(
+            Long id,
+            Product product
+    ) {
+
+        Product existing =
+                productRepository.findById(id)
+                        .orElseThrow(() ->
+                                new ProductNotFoundException(
+                                        "Product not found"
+                                ));
+
+        existing.setTitle(product.getTitle());
+        existing.setDescription(product.getDescription());
+        existing.setPrice(product.getPrice());
+        existing.setCategory(product.getCategory());
+
+        return productRepository.save(existing);
     }
 
     @Override
     public void deleteProduct(Long id) {
-        restTemplate.delete(apiUrl + "/" + id);
+
+        Product existing =
+                productRepository.findById(id)
+                        .orElseThrow(() ->
+                                new ProductNotFoundException(
+                                        "Product not found"
+                                ));
+
+        productRepository.delete(existing);
     }
 }

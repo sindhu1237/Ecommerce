@@ -17,11 +17,16 @@ public class UserController {
     public UserController(UserService userService) {
         this.userService = userService;
     }
+    @PostMapping("/sync")
+    public List<User> syncUsers() {
+        return userService.syncUsersFromApi();
+    }
 
     @GetMapping("/")
     public List<com.app.ecomapplication.model.User> getAllUsers() {
         return userService.getAllUsers();
     }
+
 
     @GetMapping("/{id}")
     public User getUserById(@PathVariable Long id) {

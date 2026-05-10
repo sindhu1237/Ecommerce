@@ -1,8 +1,6 @@
 package com.app.ecomapplication.service;
-
 import com.app.ecomapplication.model.Category;
 import com.app.ecomapplication.model.Product;
-
 import java.util.List;
 
 public interface ProductService {
@@ -15,4 +13,5 @@ public interface ProductService {
     Product addProduct(Product product);
     Product updateProduct(Long id, Product product);
     void deleteProduct(Long id);
+    List<Product> syncProductsFromApi();
 }

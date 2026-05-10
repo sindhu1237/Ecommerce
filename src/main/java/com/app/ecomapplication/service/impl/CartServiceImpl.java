@@ -1,111 +1,175 @@
 package com.app.ecomapplication.service.impl;
 
-import com.app.ecomapplication.constants.FakeStoreApiConstants;
 import com.app.ecomapplication.exception.CartNotFoundException;
 import com.app.ecomapplication.model.Cart;
+import com.app.ecomapplication.model.CartItem;
+import com.app.ecomapplication.repository.CartRepository;
 import com.app.ecomapplication.service.CartService;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
-
 @Service
-public class CartServiceImpl implements CartService {
+public class CartServiceImpl
+        implements CartService {
 
     @Value("${cart.fakestore.api.url}")
     private String apiUrl;
 
+    private final CartRepository cartRepository;
+
     private final RestTemplate restTemplate;
 
-    public CartServiceImpl(RestTemplate restTemplate) {
+    public CartServiceImpl(
+            CartRepository cartRepository,
+            RestTemplate restTemplate
+    ) {
+        this.cartRepository = cartRepository;
         this.restTemplate = restTemplate;
     }
 
     @Override
     public List<Cart> getAllCarts() {
-        ResponseEntity<Cart[]> response = restTemplate.getForEntity(apiUrl, Cart[].class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new CartNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return Arrays.asList(response.getBody());
+
+        return cartRepository.findAll();
     }
 
     @Override
     public Cart getCartById(Long id) {
-        Cart cart = restTemplate.getForObject(apiUrl + "/" + id, Cart.class);
-        if (cart == null) {
-            throw new CartNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return cart;
+
+        return cartRepository.findById(id)
+                .orElseThrow(() ->
+                        new CartNotFoundException(
+                                "Cart not found"
+                        ));
     }
 
     @Override
     public List<Cart> getCartsLimited(int limit) {
-        ResponseEntity<Cart[]> response = restTemplate.getForEntity(apiUrl + "?limit=" + limit, Cart[].class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new CartNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return Arrays.asList(response.getBody());
+
+        return cartRepository.findAll()
+                .stream()
+                .limit(limit)
+                .toList();
     }
 
     @Override
     public List<Cart> getCartsSorted(String sort) {
-        ResponseEntity<Cart[]> response = restTemplate.getForEntity(apiUrl + "?sort=" + sort, Cart[].class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new CartNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
+
+        if (sort.equalsIgnoreCase("desc")) {
+
+            return cartRepository.findAll(
+                    Sort.by(Sort.Direction.DESC, "id")
+            );
         }
-        return Arrays.asList(response.getBody());
+
+        return cartRepository.findAll(
+                Sort.by(Sort.Direction.ASC, "id")
+        );
     }
 
     @Override
-    public List<Cart> getCartsByDateRange(String startDate, String endDate) {
-        String url = String.format("%s?startdate=%s&enddate=%s", apiUrl, startDate, endDate);
-        ResponseEntity<Cart[]> response = restTemplate.getForEntity(url, Cart[].class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new CartNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return Arrays.asList(response.getBody());
+    public List<Cart> getCartsByDateRange(
+            String startDate,
+            String endDate
+    ) {
+
+        return cartRepository.findByDateBetween(
+                LocalDate.parse(startDate),
+                LocalDate.parse(endDate)
+        );
     }
 
     @Override
     public List<Cart> getCartsByUserId(Long userId) {
-        String url = String.format("%s/user/%d", apiUrl, userId);
-        ResponseEntity<Cart[]> response = restTemplate.getForEntity(url, Cart[].class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new CartNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
-        }
-        return Arrays.asList(response.getBody());
+
+        return cartRepository.findByUserId(userId);
     }
 
     @Override
     public Cart addCart(Cart cart) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Cart> request = new HttpEntity<>(cart, headers);
-        ResponseEntity<Cart> response = restTemplate.exchange(apiUrl, HttpMethod.POST, request, Cart.class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new CartNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
+
+        for (CartItem item : cart.getProducts()) {
+
+            item.setCart(cart);
         }
-        return response.getBody();
+
+        return cartRepository.save(cart);
     }
 
     @Override
-    public Cart updateCart(Long id, Cart cart) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Cart> request = new HttpEntity<>(cart, headers);
-        ResponseEntity<Cart> response = restTemplate.exchange(apiUrl + id, HttpMethod.PUT, request, Cart.class);
-        if (response.getStatusCode() != HttpStatusCode.valueOf(200)) {
-            throw new CartNotFoundException(FakeStoreApiConstants.DATA_NOT_FOUND);
+    public Cart updateCart(
+            Long id,
+            Cart cart
+    ) {
+
+        Cart existingCart =
+                getCartById(id);
+
+        existingCart.setUserId(
+                cart.getUserId()
+        );
+
+        existingCart.setDate(
+                cart.getDate()
+        );
+
+        existingCart.getProducts().clear();
+
+        for (CartItem item : cart.getProducts()) {
+
+            item.setCart(existingCart);
+
+            existingCart.getProducts()
+                    .add(item);
         }
-        return response.getBody();
+
+        return cartRepository.save(existingCart);
     }
 
     @Override
     public void deleteCart(Long id) {
-        restTemplate.delete(apiUrl + id);
+
+        Cart cart = getCartById(id);
+
+        cartRepository.delete(cart);
     }
+@Override
+public List<Cart> syncCartsFromApi() {
+
+    Cart[] apiCarts =
+            restTemplate.getForObject(
+                    apiUrl,
+                    Cart[].class
+            );
+
+    if (apiCarts == null) {
+
+        throw new CartNotFoundException(
+                "No carts found"
+        );
+    }
+
+    List<Cart> carts =
+            Arrays.asList(apiCarts);
+
+    for (Cart cart : carts) {
+
+        System.out.println("CART: " + cart);
+
+        System.out.println(
+                "PRODUCTS SIZE: "
+                        + cart.getProducts().size()
+        );
+
+        for (CartItem item : cart.getProducts()) {
+
+            item.setCart(cart);
+        }
+    }
+    return cartRepository.saveAll(carts);
+}
 }
