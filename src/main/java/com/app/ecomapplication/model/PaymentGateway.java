@@ -1,5 +1,4 @@
 package com.app.ecomapplication.model;
-
 public enum PaymentGateway {
     STRIPE,
     PAYPAL,

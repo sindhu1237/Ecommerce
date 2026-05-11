@@ -11,29 +11,19 @@ import java.util.Arrays;
 import java.util.List;
 @Service
 public class UserServiceImpl implements UserService {
-
     @Value("${user.fakestore.api.url}")
     private String apiUrl;
     private final UserRepository userRepository;
     private final RestTemplate restTemplate;
-    public UserServiceImpl(
-            UserRepository userRepository,
-            RestTemplate restTemplate
-    ) {
+    public UserServiceImpl(UserRepository userRepository, RestTemplate restTemplate) {
         this.userRepository = userRepository;
         this.restTemplate = restTemplate;
     }
     @Override
     public List<User> syncUsersFromApi() {
-        User[] apiUsers =
-                restTemplate.getForObject(
-                        apiUrl,
-                        User[].class
-                );
+        User[] apiUsers = restTemplate.getForObject(apiUrl, User[].class);
         if (apiUsers == null) {
-            throw new UserNotFoundException(
-                    "No users found from API"
-            );
+            throw new UserNotFoundException("No users found from API");
         }
         List<User> users = Arrays.asList(apiUsers);
         users.forEach(user -> user.setId(null));
@@ -46,16 +36,11 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User getUserById(Long id) {
-
         return userRepository.findById(id)
-                .orElseThrow(() ->
-                        new UserNotFoundException(
-                                "User not found"
-                        ));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
     }
     @Override
     public List<User> getUsersLimited(int limit) {
-
         return userRepository.findAll()
                 .stream()
                 .limit(limit)
@@ -63,11 +48,9 @@ public class UserServiceImpl implements UserService {
     }
     @Override
     public List<User> getUsersSorted(String sort) {
-
         Sort sorting = sort.equalsIgnoreCase("desc")
                 ? Sort.by("username").descending()
                 : Sort.by("username").ascending();
-
         return userRepository.findAll(sorting);
     }
 
@@ -78,33 +61,20 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User updateUser(Long id, User user) {
-
-        User existing =
-                userRepository.findById(id)
-                        .orElseThrow(() ->
-                                new UserNotFoundException(
-                                        "User not found"
-                                ));
-
+        User existing = userRepository.findById(id).orElseThrow(() ->
+                                new UserNotFoundException("User not found"));
         existing.setEmail(user.getEmail());
         existing.setUsername(user.getUsername());
         existing.setPassword(user.getPassword());
         existing.setName(user.getName());
         existing.setAddress(user.getAddress());
         existing.setPhone(user.getPhone());
-
         return userRepository.save(existing);
     }
     @Override
     public void deleteUser(Long id) {
-
-        User existing =
-                userRepository.findById(id)
-                        .orElseThrow(() ->
-                                new UserNotFoundException(
-                                        "User not found"
-                                ));
-
+        User existing = userRepository.findById(id).orElseThrow(() ->
+                                new UserNotFoundException("User not found"));
         userRepository.delete(existing);
     }
 }

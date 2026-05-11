@@ -1,8 +1,5 @@
 package com.app.ecomapplication.exception;
-
-public class AuthException
-        extends RuntimeException {
-
+public class AuthException extends RuntimeException {
     public AuthException(String message) {
         super(message);
     }

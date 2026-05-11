@@ -1,10 +1,8 @@
 package com.app.ecomapplication.model;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import jakarta.persistence.*;
 import lombok.NoArgsConstructor;
-
 @Entity
 @Table(name = "products")
 @Data
